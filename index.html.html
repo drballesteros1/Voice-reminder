@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>Voice Reminder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #161616;
+    --surface-2: #1f1f1f;
+    --border: #2a2a2a;
+    --text: #f5f1ea;
+    --text-dim: #8a8580;
+    --accent: #d4a574;
+    --accent-hot: #e85d3a;
+    --success: #6b9971;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 400;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overscroll-behavior: none;
+  }
+
+  body {
+    padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+    background:
+      radial-gradient(ellipse at top, rgba(212, 165, 116, 0.06), transparent 60%),
+      radial-gradient(ellipse at bottom right, rgba(232, 93, 58, 0.04), transparent 50%),
+      var(--bg);
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; opacity: 0.4; z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  }
+
+  header {
+    padding: 24px 4px 16px;
+    position: relative; z-index: 2;
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  h1 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--accent);
+  }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 12px 0 28px;
+    position: relative; z-index: 2;
+  }
+
+  /* === Recording panel === */
+  .recorder {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px 22px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .recorder::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(232, 93, 58, 0.08), transparent 70%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .recorder.recording::before { opacity: 1; }
+
+  .visualiser {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    margin-bottom: 20px;
+  }
+
+  .bar {
+    width: 3px;
+    background: var(--text-dim);
+    border-radius: 2px;
+    height: 8px;
+    transition: height 0.08s ease-out, background 0.3s;
+  }
+
+  .recording .bar { background: var(--accent-hot); }
+
+  .timer {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    text-align: center;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+    letter-spacing: 0.05em;
+  }
+
+  .timer.live { color: var(--accent-hot); }
+
+  .rec-btn {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent-hot);
+    margin: 0 auto;
+    display: block;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.15s, background 0.3s;
+    box-shadow: 0 8px 24px rgba(232, 93, 58, 0.35);
+  }
+
+  .rec-btn:active { transform: scale(0.95); }
+
+  .rec-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--text);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .recording .rec-btn::after {
+    border-radius: 6px;
+    width: 22px; height: 22px;
+  }
+
+  .rec-label {
+    text-align: center;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* === Transcription block === */
+  .transcript-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 22px;
+    display: none;
+  }
+
+  .transcript-box.visible { display: block; animation: slideUp 0.4s ease; }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .transcript {
+    font-size: 18px;
+    line-height: 1.5;
+    font-weight: 400;
+    color: var(--text);
+    min-height: 28px;
+  }
+
+  .transcript[contenteditable]:focus {
+    outline: 1px solid var(--accent);
+    outline-offset: 6px;
+    border-radius: 4px;
+  }
+
+  audio {
+    width: 100%;
+    margin-top: 14px;
+    border-radius: 12px;
+  }
+
+  /* === Date/time === */
+  .datetime-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .field {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+  }
+
+  .field label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  input[type="date"], input[type="time"] {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    width: 100%;
+    padding: 0;
+    -webkit-appearance: none;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+  }
+
+  .quick-dates {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .quick-dates::-webkit-scrollbar { display: none; }
+
+  .quick {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 14px;
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .quick:active, .quick.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+
+  /* === Calendar button === */
+  .cal-btn {
+    width: 100%;
+    background: var(--text);
+    color: var(--bg);
+    border: none;
+    padding: 18px;
+    border-radius: 16px;
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin-top: 18px;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .cal-btn:active { transform: scale(0.98); }
+  .cal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .cal-btn svg { width: 18px; height: 18px; }
+
+  .reset-btn {
+    width: 100%;
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 12px;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 8px;
+    cursor: pointer;
+  }
+
+  /* === Status === */
+  .status {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    padding: 8px;
+  }
+
+  .status.error { color: var(--accent-hot); }
+  .status.success { color: var(--success); }
+
+  footer {
+    padding: 16px 4px 8px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    opacity: 0.5;
+    position: relative; z-index: 2;
+  }
+
+  @media (max-height: 700px) {
+    h1 { font-size: 26px; }
+    .recorder { padding: 22px 18px; }
+    .rec-btn { width: 76px; height: 76px; }
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<header>
+  <div class="eyebrow">DBQ · Voice memo to calendar</div>
+  <h1>Habla.<br><em>Recuerda.</em></h1>
+</header>
+
+<main>
+  <section class="recorder" id="recorder">
+    <div class="visualiser" id="viz"></div>
+    <div class="timer" id="timer">00:00</div>
+    <button class="rec-btn" id="recBtn" aria-label="Grabar"></button>
+    <div class="rec-label" id="recLabel">Pulsa para grabar</div>
+  </section>
+
+  <section class="transcript-box" id="transcriptBox">
+    <div class="label">Transcripción</div>
+    <div class="transcript" id="transcript" contenteditable="true" spellcheck="true"></div>
+    <audio id="audioPlayer" controls></audio>
+
+    <div class="datetime-row">
+      <div class="field">
+        <label>Fecha</label>
+        <input type="date" id="dateInput">
+      </div>
+      <div class="field">
+        <label>Hora</label>
+        <input type="time" id="timeInput" value="09:00">
+      </div>
+    </div>
+
+    <div class="quick-dates">
+      <button class="quick" data-days="0">Hoy</button>
+      <button class="quick" data-days="1">Mañana</button>
+      <button class="quick" data-days="2">+2 días</button>
+      <button class="quick" data-days="7">+1 semana</button>
+      <button class="quick" data-days="14">+2 semanas</button>
+      <button class="quick" data-days="30">+1 mes</button>
+      <button class="quick" data-days="90">+3 meses</button>
+    </div>
+
+    <button class="cal-btn" id="calBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      Añadir a Google Calendar
+    </button>
+
+    <button class="reset-btn" id="resetBtn">Nueva grabación</button>
+  </section>
+
+  <div class="status" id="status"></div>
+</main>
+
+<footer>St Bernard's · Gibraltar</footer>
+
+<script>
+(() => {
+  const recBtn = document.getElementById('recBtn');
+  const recLabel = document.getElementById('recLabel');
+  const recorder = document.getElementById('recorder');
+  const timer = document.getElementById('timer');
+  const viz = document.getElementById('viz');
+  const transcriptBox = document.getElementById('transcriptBox');
+  const transcriptEl = document.getElementById('transcript');
+  const audioPlayer = document.getElementById('audioPlayer');
+  const dateInput = document.getElementById('dateInput');
+  const timeInput = document.getElementById('timeInput');
+  const calBtn = document.getElementById('calBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const statusEl = document.getElementById('status');
+
+  // Build visualiser bars
+  const BAR_COUNT = 32;
+  const bars = [];
+  for (let i = 0; i < BAR_COUNT; i++) {
+    const b = document.createElement('div');
+    b.className = 'bar';
+    viz.appendChild(b);
+    bars.push(b);
+  }
+
+  // Default date = tomorrow 09:00
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  dateInput.value = tomorrow.toISOString().split('T')[0];
+
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let audioStream = null;
+  let audioContext = null;
+  let analyser = null;
+  let animationId = null;
+  let startTime = 0;
+  let timerInterval = null;
+  let recognition = null;
+  let transcriptText = '';
+  let isRecording = false;
+
+  function setStatus(msg, type = '') {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (type ? ' ' + type : '');
+    if (msg) setTimeout(() => { if (statusEl.textContent === msg) setStatus(''); }, 4000);
+  }
+
+  function formatTime(ms) {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  function animateBars() {
+    if (!analyser) return;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    const step = Math.floor(data.length / BAR_COUNT);
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const v = data[i * step] / 255;
+      bars[i].style.height = `${8 + v * 50}px`;
+    }
+    animationId = requestAnimationFrame(animateBars);
+  }
+
+  function setupSpeechRecognition() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return null;
+    const r = new SR();
+    r.continuous = true;
+    r.interimResults = true;
+    r.lang = 'es-ES';
+
+    r.onresult = (e) => {
+      let interim = '';
+      let final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t + ' ';
+        else interim += t;
+      }
+      if (final) transcriptText += final;
+      transcriptEl.textContent = (transcriptText + interim).trim();
+    };
+
+    r.onerror = (e) => {
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        console.warn('Speech recognition error:', e.error);
+      }
+    };
+
+    return r;
+  }
+
+  async function startRecording() {
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      setStatus('No se pudo acceder al micrófono. Revisa permisos.', 'error');
+      return;
+    }
+
+    // Audio analysis
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 128;
+    const source = audioContext.createMediaStreamSource(audioStream);
+    source.connect(analyser);
+    animateBars();
+
+    // Recorder
+    audioChunks = [];
+    const mime = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+              : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+              : '';
+    mediaRecorder = new MediaRecorder(audioStream, mime ? { mimeType: mime } : {});
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(audioChunks, { type: mime || 'audio/webm' });
+      audioPlayer.src = URL.createObjectURL(blob);
+    };
+    mediaRecorder.start();
+
+    // Speech recognition
+    transcriptText = '';
+    transcriptEl.textContent = '';
+    recognition = setupSpeechRecognition();
+    if (recognition) {
+      try { recognition.start(); } catch (e) { /* already running */ }
+    } else {
+      transcriptEl.textContent = '(Transcripción no soportada en este navegador — escribe el recordatorio manualmente)';
+    }
+
+    // UI
+    isRecording = true;
+    recorder.classList.add('recording');
+    recLabel.textContent = 'Grabando · pulsa para parar';
+    timer.classList.add('live');
+    startTime = Date.now();
+    timerInterval = setInterval(() => {
+      timer.textContent = formatTime(Date.now() - startTime);
+    }, 200);
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if (recognition) { try { recognition.stop(); } catch (e) {} }
+    if (audioStream) audioStream.getTracks().forEach(t => t.stop());
+    if (animationId) cancelAnimationFrame(animationId);
+    if (audioContext) audioContext.close();
+    clearInterval(timerInterval);
+
+    // Reset visualiser
+    bars.forEach(b => b.style.height = '8px');
+
+    isRecording = false;
+    recorder.classList.remove('recording');
+    recLabel.textContent = 'Pulsa para grabar de nuevo';
+    timer.classList.remove('live');
+
+    transcriptBox.classList.add('visible');
+    setTimeout(() => transcriptBox.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+    if (!transcriptEl.textContent.trim()) {
+      transcriptEl.textContent = '(toca aquí para escribir el recordatorio)';
+    }
+  }
+
+  recBtn.addEventListener('click', () => {
+    if (isRecording) stopRecording();
+    else startRecording();
+  });
+
+  // Quick date chips
+  document.querySelectorAll('.quick').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.quick').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const days = parseInt(btn.dataset.days, 10);
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      dateInput.value = d.toISOString().split('T')[0];
+    });
+  });
+
+  // Google Calendar link
+  calBtn.addEventListener('click', () => {
+    const text = transcriptEl.textContent.trim();
+    if (!text || text.startsWith('(')) {
+      setStatus('Añade un texto al recordatorio primero', 'error');
+      return;
+    }
+    if (!dateInput.value) {
+      setStatus('Elige una fecha', 'error');
+      return;
+    }
+
+    const [year, month, day] = dateInput.value.split('-').map(Number);
+    const [hour, minute] = (timeInput.value || '09:00').split(':').map(Number);
+
+    const start = new Date(year, month - 1, day, hour, minute);
+    const end = new Date(start.getTime() + 30 * 60 * 1000); // 30 min
+
+    const fmt = (d) => {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const hh = String(d.getUTCHours()).padStart(2, '0');
+      const mm = String(d.getUTCMinutes()).padStart(2, '0');
+      const ss = String(d.getUTCSeconds()).padStart(2, '0');
+      return `${y}${m}${dd}T${hh}${mm}${ss}Z`;
+    };
+
+    // Title = first 60 chars, details = full text
+    const title = text.length > 60 ? text.slice(0, 57) + '…' : text;
+    const url = new URL('https://calendar.google.com/calendar/render');
+    url.searchParams.set('action', 'TEMPLATE');
+    url.searchParams.set('text', title);
+    url.searchParams.set('dates', `${fmt(start)}/${fmt(end)}`);
+    url.searchParams.set('details', text);
+
+    window.open(url.toString(), '_blank');
+    setStatus('Abriendo Google Calendar…', 'success');
+  });
+
+  resetBtn.addEventListener('click', () => {
+    transcriptBox.classList.remove('visible');
+    transcriptEl.textContent = '';
+    transcriptText = '';
+    audioPlayer.src = '';
+    timer.textContent = '00:00';
+    recLabel.textContent = 'Pulsa para grabar';
+    document.querySelectorAll('.quick').forEach(b => b.classList.remove('active'));
+    const t = new Date(); t.setDate(t.getDate() + 1);
+    dateInput.value = t.toISOString().split('T')[0];
+    timeInput.value = '09:00';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // Clear placeholder on focus
+  transcriptEl.addEventListener('focus', () => {
+    if (transcriptEl.textContent.startsWith('(')) transcriptEl.textContent = '';
+  });
+})();
+</script>
+</body>
+</html>
